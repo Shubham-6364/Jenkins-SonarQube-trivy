@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment # Kubernetes resource kind we are creating
+metadata:
+  name: boardgame-deployment
+  namespace: webapps
+spec:
+  selector:
+    matchLabels:
+      app: boardgame
+  replicas: 2 # Number of replicas that will be created for this deployment
+  template:
+    metadata:
+      labels:
+        app: boardgame
+    spec:
+      containers:
+        - name: boardgame
+          image: jacksneel/devproject:latest # Image that will be used to containers in the cluster
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080 # The port that the container is running on in the cluster
+
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: boardgame-ssvc
+  namespace: webapps
+spec:
+  selector:
+    app: boardgame
+  type: NodePort
+  ports:
+    - targetPort: 8080
+      port: 8080
+      nodePort: 30080
