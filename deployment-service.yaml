@@ -18,7 +18,7 @@ spec:
           image: codersdiary/nodejs:latest # Image that will be used to containers in the cluster
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080 # The port that the container is running on in the cluster
+            - containerPort: 8085 # The port that the container is running on in the cluster
       imagePullSecrets:
         - name: dockerhub-secret  
 
@@ -34,6 +34,6 @@ spec:
     app: boardgame
   type: NodePort
   ports:
-    - targetPort: 8080
-      port: 8080
+    - targetPort: 8085
+      port: 8085
       nodePort: 30080
