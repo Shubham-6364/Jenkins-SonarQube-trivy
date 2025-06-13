@@ -16,5 +16,5 @@ WORKDIR /usr/src/app
 # Copy only the built jar
 COPY --from=builder /app/target/*.jar app.jar
 
-EXPOSE 8085
+EXPOSE 8080
 CMD ["java", "-jar", "app.jar"]
