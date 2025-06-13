@@ -1,0 +1,104 @@
+pipeline {
+    agent any
+    tools {
+        maven 'maven3'
+        jdk 'jdk17'
+    }
+
+    environment {
+        scannerHome = tool 'sonar-scanner'
+        IMAGE = "codersdiary/nodejs"
+        VERSION = "${new Date().format('yyyyMMddHHmmss')}"
+        CONTAINER_NAME = "java-container"
+       TRIVY_CACHE_DIR = "${env.WORKSPACE}/trivy-cache"
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Shubham-6364/Jenkins-SonarQube-trivy.git'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('File System Scan') {
+            steps {
+                sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --format table -o trivy-fs-report.html ."
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQubeServer') {
+                    sh '''
+                        ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=javaproject \
+                        -Dsonar.projectName=javaproject \
+                        -Dsonar.sources=src/main/java \
+                        -Dsonar.tests=src/test/java \
+                        -Dsonar.java.binaries=target
+                    '''
+                }
+            }
+        }
+
+        stage('SonarQube Quality Gate') {
+            steps {
+                waitForQualityGate abortPipeline: false, credentialsId: 'SonarQubeServer'
+            }
+        }
+
+        
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE}:${VERSION} ."
+                sh "docker tag ${IMAGE}:${VERSION} ${IMAGE}:latest"
+            }
+        }
+
+        stage('Docker Image Scan') {
+            steps {
+                sh "trivy image --cache-dir ${TRIVY_CACHE_DIR} --format table -o trivy-report.html ${IMAGE}:latest"
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('', 'dockerhub-creds') {
+                        sh "docker push ${IMAGE}:${VERSION}"
+                        sh "docker push ${IMAGE}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    // Substitute image tag dynamically into a temporary file
+                    sh """
+                        sed 's|image: ${IMAGE}:.*|image: ${IMAGE}:${VERSION}|' deployment-service.yaml > updated-deployment.yaml
+                    """
+                }
+                withKubeConfig(
+                    credentialsId: 'k8-cred',
+                    namespace: 'webapps',
+                    serverUrl: 'https://172.31.20.199:6443') {
+                    sh "kubectl apply -f updated-deployment.yaml"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: '**/trivy-*.html', allowEmptyArchive: true
+        }
+    }
+}
