@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: boardgame
-          image: codersdiary/nodejs:20251216182417
+          image: codersdiary/nodejs:20251216182826
           imagePullPolicy: Always
           ports:
             - containerPort: 8080 # The port that the container is running on in the cluster
